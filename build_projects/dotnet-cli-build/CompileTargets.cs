@@ -131,7 +131,7 @@ namespace Microsoft.DotNet.Cli.Build
             Directory.CreateDirectory(Dirs.Stage1);
 
             CopySharedHost(Dirs.Stage1);
-            PublishSharedFramework(c, Dirs.Stage1, DotNetCli.Stage0);
+            PublishSharedFramework(c, Dirs.Stage1, DotNetCli.Stage0, nuGetVersion: "3.5.0-rc-1285");
             var result = CompileCliSdk(c,
                 dotnet: DotNetCli.Stage0,
                 outputDir: Dirs.Stage1);
@@ -156,8 +156,12 @@ namespace Microsoft.DotNet.Cli.Build
                 Utils.DeleteDirectory(Dirs.Stage2);
             }
             Directory.CreateDirectory(Dirs.Stage2);
+            
+            // NOTE: This is necessary for bootstrapping https://github.com/dotnet/cli/issues/2874.
+            //       This code will be removed after change has made its way into stage 0.
+            CaseInsensitivePaths.Restore(c, DotNetCli.Stage1);
 
-            PublishSharedFramework(c, Dirs.Stage2, DotNetCli.Stage1);
+            PublishSharedFramework(c, Dirs.Stage2, DotNetCli.Stage1, nuGetVersion: null);
             CopySharedHost(Dirs.Stage2);
             var result = CompileCliSdk(c,
                 dotnet: DotNetCli.Stage1,
@@ -219,7 +223,7 @@ namespace Microsoft.DotNet.Cli.Build
                 Path.Combine(outputDir, DotnetHostFxrBaseName), true);
         }
 
-        public static void PublishSharedFramework(BuildTargetContext c, string outputDir, DotNetCli dotnetCli)
+        public static void PublishSharedFramework(BuildTargetContext c, string outputDir, DotNetCli dotnetCli, string nuGetVersion)
         {
             string SharedFrameworkTemplateSourceRoot = Path.Combine(Dirs.RepoRoot, "src", "sharedframework", "framework");
             string SharedFrameworkNugetVersion = c.BuildContext.Get<string>("SharedFrameworkNugetVersion");
@@ -288,6 +292,10 @@ namespace Microsoft.DotNet.Cli.Build
                 var runtimeGraphGeneratorProject = Path.Combine(Dirs.RepoRoot, "tools", runtimeGraphGeneratorName);
                 var runtimeGraphGeneratorOutput = Path.Combine(Dirs.Output, "tools", runtimeGraphGeneratorName);
 
+                // NOTE: This is necessary for bootstrapping https://github.com/dotnet/cli/issues/2874.
+                //       This code will be removed after change has made its way into stage 0.
+                var originals = CaseInsensitivePaths.PrepareForRuntimeGraphGenerator(c, dotnetCli, runtimeGraphGeneratorName, nuGetVersion);
+
                 dotnetCli.Publish(
                     "--output", runtimeGraphGeneratorOutput,
                     runtimeGraphGeneratorProject).Execute().EnsureSuccessful();
@@ -296,6 +304,10 @@ namespace Microsoft.DotNet.Cli.Build
                 Cmd(runtimeGraphGeneratorExe, "--project", SharedFrameworkSourceRoot, "--deps", destinationDeps, runtimeGraphGeneratorRuntime)
                     .Execute()
                     .EnsureSuccessful();
+
+                // NOTE: This is necessary for bootstrapping https://github.com/dotnet/cli/issues/2874.
+                //       This code will be removed after change has made its way into stage 0.
+                CaseInsensitivePaths.CleanUpAfterRuntimeGraphGenerator(c, dotnetCli, nuGetVersion, originals);
             }
             else
             {
