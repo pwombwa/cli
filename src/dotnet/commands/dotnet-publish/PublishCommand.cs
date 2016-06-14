@@ -141,7 +141,7 @@ namespace Microsoft.DotNet.Tools.Publish
             var allExclusionList = new HashSet<string>(platformExclusionList);
             allExclusionList.UnionWith(buildExclusionList);
 
-            foreach (var export in FilterExports(exports, allExclusionList))
+            foreach (var export in exports.FilterExports(allExclusionList))
             {
                 Reporter.Verbose.WriteLine($"publish: Publishing {export.Library.Identity.ToString().Green().Bold()} ...");
 
@@ -173,7 +173,10 @@ namespace Microsoft.DotNet.Tools.Publish
             {
                 // Make executable in the new location
                 var executable = new Executable(context, buildOutputPaths, outputPath, buildOutputPaths.IntermediateOutputDirectoryPath, exporter, configuration);
-                executable.WriteConfigurationFiles(exports, FilterExports(exports, buildExclusionList), includeDevConfig: false);
+                var runtimeExports = exports.FilterExports(allExclusionList);
+                var compilationExports = exports.FilterExports(buildExclusionList);
+
+                executable.WriteConfigurationFiles(exports, runtimeExports, compilationExports, includeDevConfig: false);
             }
 
             var contentFiles = new ContentFiles(context);
@@ -206,10 +209,6 @@ namespace Microsoft.DotNet.Tools.Publish
             return true;
         }
 
-        private static IEnumerable<LibraryExport> FilterExports(IEnumerable<LibraryExport> exports, HashSet<string> exclusionList)
-        {
-            return exports.Where(e => !exclusionList.Contains(e.Library.Identity.Name));
-        }
 
         /// <summary>
         /// Filters which export's RuntimeAssets should get copied to the output path.

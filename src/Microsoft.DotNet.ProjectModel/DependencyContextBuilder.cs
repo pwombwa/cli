@@ -106,69 +106,66 @@ namespace Microsoft.Extensions.DependencyModel
             IDictionary<string, Dependency> dependencyLookup,
             bool runtime)
         {
-            return exports.Select(export => GetLibrary(export, runtime, dependencyLookup));
-        }
-
-        private Library GetLibrary(LibraryExport export,
-            bool runtime,
-            IDictionary<string, Dependency> dependencyLookup)
-        {
-            var type = export.Library.Identity.Type;
-
-            // TEMPORARY: All packages are serviceable in RC2
-            // See https://github.com/dotnet/cli/issues/2569
-            var serviceable = (export.Library as PackageDescription) != null;
-            var libraryDependencies = new HashSet<Dependency>();
-
-            foreach (var libraryDependency in export.Library.Dependencies)
+            foreach (var export in exports)
             {
-                // skip build time dependencies
-                if (libraryDependency.Type.Equals(LibraryDependencyType.Build))
+                var type = export.Library.Identity.Type;
+                var libraryDependencies = new HashSet<Dependency>();
+
+                foreach (var libraryDependency in export.Library.Dependencies)
                 {
-                    continue;
+                    // skip build time dependencies
+                    if (libraryDependency.Type.Equals(LibraryDependencyType.Build))
+                    {
+                        continue;
+                    }
+
+                    Dependency dependency;
+                    if (dependencyLookup.TryGetValue(libraryDependency.Name, out dependency))
+                    {
+                        libraryDependencies.Add(dependency);
+                    }
                 }
 
-                Dependency dependency;
-                if (dependencyLookup.TryGetValue(libraryDependency.Name, out dependency))
-                {
-                    libraryDependencies.Add(dependency);
-                }
-            }
+                // TEMPORARY: All packages are serviceable in RC2
+                // See https://github.com/dotnet/cli/issues/2569
+                var serviceable = (export.Library as PackageDescription) != null;
 
-            if (runtime)
-            {
-                return new RuntimeLibrary(
-                    type.ToString().ToLowerInvariant(),
-                    export.Library.Identity.Name,
-                    export.Library.Identity.Version.ToString(),
-                    export.Library.Hash,
-                    export.RuntimeAssemblyGroups.Select(CreateRuntimeAssetGroup).ToArray(),
-                    export.NativeLibraryGroups.Select(CreateRuntimeAssetGroup).ToArray(),
-                    export.ResourceAssemblies.Select(CreateResourceAssembly),
-                    libraryDependencies,
-                    serviceable
+                if (runtime)
+                {
+
+                    yield return new RuntimeLibrary(
+                        type.ToString().ToLowerInvariant(),
+                        export.Library.Identity.Name,
+                        export.Library.Identity.Version.ToString(),
+                        export.Library.Hash,
+                        export.RuntimeAssemblyGroups.Select(CreateRuntimeAssetGroup).ToArray(),
+                        export.NativeLibraryGroups.Select(CreateRuntimeAssetGroup).ToArray(),
+                        export.ResourceAssemblies.Select(CreateResourceAssembly),
+                        libraryDependencies,
+                        serviceable
                     );
-            }
-            else
-            {
-                IEnumerable<string> assemblies;
-                if (type == LibraryType.ReferenceAssembly)
-                {
-                    assemblies = ResolveReferenceAssembliesPath(export.CompilationAssemblies);
                 }
                 else
                 {
-                    assemblies = export.CompilationAssemblies.Select(libraryAsset => libraryAsset.RelativePath);
-                }
+                    IEnumerable<string> assemblies;
+                    if (type == LibraryType.ReferenceAssembly)
+                    {
+                        assemblies = ResolveReferenceAssembliesPath(export.CompilationAssemblies);
+                    }
+                    else
+                    {
+                        assemblies = export.CompilationAssemblies.Select(libraryAsset => libraryAsset.RelativePath);
+                    }
 
-                return new CompilationLibrary(
-                    type.ToString().ToLowerInvariant(),
-                    export.Library.Identity.Name,
-                    export.Library.Identity.Version.ToString(),
-                    export.Library.Hash,
-                    assemblies,
-                    libraryDependencies,
-                    serviceable);
+                    yield return new CompilationLibrary(
+                        type.ToString().ToLowerInvariant(),
+                        export.Library.Identity.Name,
+                        export.Library.Identity.Version.ToString(),
+                        export.Library.Hash,
+                        assemblies,
+                        libraryDependencies,
+                        serviceable);
+                }
             }
         }
 

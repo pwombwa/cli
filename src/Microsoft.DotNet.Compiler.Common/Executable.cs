@@ -107,7 +107,7 @@ namespace Microsoft.DotNet.Cli.Compiler.Common
             }
         }
 
-        private void CopyContentFiles()
+        private void CopyContentFiles() 
         {
             var contentFiles = new ContentFiles(_context);
 
@@ -159,7 +159,12 @@ namespace Microsoft.DotNet.Cli.Compiler.Common
         {
             // When called this way we don't need to filter exports, so we pass the same list to both.
             var exports = exporter.GetAllExports().ToList();
-            WriteConfigurationFiles(exports, exports, includeDevConfig: true);
+
+            var exportsLookup = exports.ToDictionary(e => e.Library.Identity.Name);
+            var platformExclusionList = _context.GetPlatformExclusionList(exportsLookup);
+            var filteredExports = exports.FilterExports(platformExclusionList);
+
+            WriteConfigurationFiles(exports, filteredExports, exports, includeDevConfig: true);
 
             var projectExports = exporter.GetAllProjectTypeDependencies();
             CopyAssemblies(projectExports);
@@ -169,9 +174,13 @@ namespace Microsoft.DotNet.Cli.Compiler.Common
             CopyAssets(packageExports);
         }
 
-        public void WriteConfigurationFiles(IEnumerable<LibraryExport> allExports, IEnumerable<LibraryExport> depsExports, bool includeDevConfig)
+        public void WriteConfigurationFiles(
+            IEnumerable<LibraryExport> allExports,
+            IEnumerable<LibraryExport> depsRuntimeExports,
+            IEnumerable<LibraryExport> depsCompilationExports,
+            bool includeDevConfig)
         {
-            WriteDeps(depsExports);
+            WriteDeps(depsRuntimeExports, depsCompilationExports);
             if (_context.ProjectFile.HasRuntimeOutput(_configuration))
             {
                 WriteRuntimeConfig(allExports);
@@ -272,7 +281,7 @@ namespace Microsoft.DotNet.Cli.Compiler.Common
             runtimeOptions.Add("additionalProbingPaths", additionalProbingPaths);
         }
 
-        public void WriteDeps(IEnumerable<LibraryExport> exports)
+        public void WriteDeps(IEnumerable<LibraryExport> runtimeExports, IEnumerable<LibraryExport> compilationExports)
         {
             Directory.CreateDirectory(_runtimeOutputPath);
 
@@ -280,8 +289,8 @@ namespace Microsoft.DotNet.Cli.Compiler.Common
 
             var dependencyContext = new DependencyContextBuilder().Build(
                 compilerOptions: includeCompile ? _compilerOptions : null,
-                compilationExports: includeCompile ? exports : null,
-                runtimeExports: exports,
+                compilationExports: includeCompile ? compilationExports : null,
+                runtimeExports: runtimeExports,
                 portable: _context.IsPortable,
                 target: _context.TargetFramework,
                 runtime: _context.RuntimeIdentifier ?? string.Empty);

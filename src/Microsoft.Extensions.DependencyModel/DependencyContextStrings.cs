@@ -25,6 +25,8 @@ namespace Microsoft.Extensions.DependencyModel
 
         internal const string TypePropertyName = "type";
 
+        internal const string EntryTypePropertyName = "entryType";
+
         internal const string ServiceablePropertyName = "serviceable";
 
         internal const string CompilationOptionsPropertName = "compilationOptions";

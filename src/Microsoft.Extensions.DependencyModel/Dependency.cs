@@ -14,9 +14,9 @@ namespace Microsoft.Extensions.DependencyModel
             {
                 throw new ArgumentException(nameof(name));
             }
-            if (string.IsNullOrEmpty(version))
+            if (version == null)
             {
-                throw new ArgumentException(nameof(version));
+                throw new ArgumentNullException(nameof(version));
             }
             Name = name;
             Version = version;
